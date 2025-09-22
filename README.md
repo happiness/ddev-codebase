@@ -11,6 +11,9 @@ ddev add-on get happiness/ddev-codebase
 
 ## PhpStorm Integration
 
+Configure a task server at _Tools > Tasks > Servers_, add a _Generic_ server with the
+following config:
+
 ```xml
 <component name="TaskManager">
   <servers>
