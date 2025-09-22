@@ -14,7 +14,7 @@ ddev add-on get happiness/ddev-codebase
 ```xml
 <component name="TaskManager">
   <servers>
-    <Generic url="https://ki.ddev.site:8081">
+    <Generic url="https://<PROJECT>.ddev.site:8081">
       <option name="loginAnonymously" value="true" />
       <option name="responseHandlers">
         <XPathResponseHandler />
