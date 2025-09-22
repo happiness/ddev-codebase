@@ -4,10 +4,10 @@
 
 require_once 'codebase.class.php';
 
-if (getenv('CODEBASE_API_KEY') !== false) trigger_error('Missing required environment variable "CODEBASE_API_KEY".', E_USER_ERROR);
-if (getenv('CODEBASE_API_URL') !== false) trigger_error('Missing required environment variable "CODEBASE_API_URL".', E_USER_ERROR);
-if (getenv('CODEBASE_PROJECT') !== false) trigger_error('Missing required environment variable "CODEBASE_PROJECT".', E_USER_ERROR);
-if (getenv('CODEBASE_USERNAME') !== false) trigger_error('Missing required environment variable "CODEBASE_USERNAME".', E_USER_ERROR);
+if (getenv('CODEBASE_API_KEY') === false) trigger_error('Missing required environment variable "CODEBASE_API_KEY".', E_USER_ERROR);
+if (getenv('CODEBASE_API_URL') === false) trigger_error('Missing required environment variable "CODEBASE_API_URL".', E_USER_ERROR);
+if (getenv('CODEBASE_PROJECT') === false) trigger_error('Missing required environment variable "CODEBASE_PROJECT".', E_USER_ERROR);
+if (getenv('CODEBASE_USERNAME') === false) trigger_error('Missing required environment variable "CODEBASE_USERNAME".', E_USER_ERROR);
 
 // Init Codebase API gateway.
 $api = new CodebaseAPI(
