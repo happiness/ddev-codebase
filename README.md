@@ -48,3 +48,14 @@ following config:
   </servers>
 </component>
 ```
+
+## .env
+
+Create a `.ddev/.env` file with the following contents or append it if the file aready exists.
+
+```.env
+CODEBASE_API_KEY=<API_KEY>
+CODEBASE_API_URL="https://api3.codebasehq.com"
+CODEBASE_PROJECT=<PROJECT-ID>
+CODEBASE_USERNAME=<API_USERNAME>
+``
