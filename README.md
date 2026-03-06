@@ -31,6 +31,8 @@ with the following config:
 }
 ```
 
+Also set the correct working directory (project root) and server level (project). 
+
 ### Task Server
 
 Configure a task server at _Tools > Tasks > Servers_, add a _Generic_ server with the
