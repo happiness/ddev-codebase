@@ -46,6 +46,7 @@ The MCP-server provides the following tools:
 * update_ticket
 * get_milestones
 * get_project_activity
+* get_project_users
 
 ### Task Server
 
