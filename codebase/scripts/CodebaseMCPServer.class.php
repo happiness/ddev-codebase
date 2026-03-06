@@ -2,9 +2,26 @@
 #ddev-generated
 #ddev-description: Class for interaction with the Codebase API via MCP protocol.
 
+/**
+ * Class CodebaseMCPServer
+ *
+ * Implements an MCP (Model Context Protocol) server for interacting with the Codebase API.
+ * This server allows MCP-compatible clients (like AI assistants) to list, get, create,
+ * and update tickets, as well as access other project resources in Codebase HQ.
+ */
 class CodebaseMCPServer {
   private string $baseUrl;
 
+  /**
+   * Initializes the Codebase MCP Server.
+   *
+   * @param string $username
+   *   The Codebase username (often in the format 'account/username').
+   * @param string $apiKey
+   *   The API key for authentication.
+   * @param string $project
+   *   The short name/permalink of the project.
+   */
   public function __construct(
     private string $username,
     private string $apiKey,
@@ -17,6 +34,8 @@ class CodebaseMCPServer {
 
   /**
    * Main loop to handle MCP requests from stdin and respond to stdout.
+   *
+   * Listens for JSON-RPC messages and dispatches them to handleRequest.
    */
   public function run(): void {
     $stdin = fopen('php://stdin', 'r');
@@ -29,6 +48,15 @@ class CodebaseMCPServer {
     }
   }
 
+  /**
+   * Handles an incoming MCP/JSON-RPC request.
+   *
+   * @param array $request
+   *   The decoded JSON request.
+   *
+   * @return array
+   *   The JSON-RPC response array.
+   */
   private function handleRequest(array $request): array {
     $method = $request['method'] ?? '';
     $params = $request['params'] ?? [];
@@ -58,6 +86,14 @@ class CodebaseMCPServer {
     }
   }
 
+  /**
+   * Handles the 'initialize' method.
+   *
+   * Provides server information and capabilities (tools and resources).
+   *
+   * @return array
+   *   Initial server metadata.
+   */
   private function initialize(): array {
     return [
       'protocolVersion' => '2024-11-05',
@@ -72,6 +108,12 @@ class CodebaseMCPServer {
     ];
   }
 
+  /**
+   * Lists all available tools provided by this MCP server.
+   *
+   * @return array
+   *   A list of tool definitions including names, descriptions, and input schemas.
+   */
   private function listTools(): array {
     return [
       'tools' => [
@@ -200,6 +242,19 @@ class CodebaseMCPServer {
     ];
   }
 
+  /**
+   * Executes a specific tool call requested by the client.
+   *
+   * @param string $name
+   *   The name of the tool to execute.
+   * @param array $args
+   *   The arguments passed to the tool.
+   *
+   * @return array
+   *   The result of the tool execution formatted for MCP.
+   *
+   * @throws Exception If the tool name is unknown.
+   */
   private function callTool(string $name, array $args): array {
     $content = match ($name) {
       'list_tickets' => $this->apiGet("/tickets", ['query' => $args['query'] ?? 'status:open']),
@@ -224,6 +279,20 @@ class CodebaseMCPServer {
     ];
   }
 
+  /**
+   * Constructs the payload for creating or updating a ticket note/change.
+   *
+   * Resolves human-readable names (status, priority, etc.) to their internal
+   * IDs.
+   *
+   * @param array $args
+   *   The arguments containing ticket update information.
+   *
+   * @return array
+   *   The formatted payload for the Codebase API.
+   *
+   * @throws \Exception
+   */
   private function buildTicketNotePayload(array $args): array {
     $ticketNote = [
       'content' => (string) ($args['content'] ?? ''),
@@ -258,6 +327,19 @@ class CodebaseMCPServer {
     return ['ticket_note' => $ticketNote];
   }
 
+  /**
+   * Helper to find the internal ID of a property (status, priority, etc.) by its name.
+   *
+   * @param string $path
+   *   The API path to fetch the list of properties.
+   * @param string $name
+   *   The name to search for.
+   *
+   * @return int
+   *   The ID of the found property.
+   *
+   * @throws Exception If the property cannot be found.
+   */
   private function findPropertyIdByName(string $path, string $name): int {
     $items = $this->apiGet($path);
 
@@ -276,6 +358,17 @@ class CodebaseMCPServer {
     throw new Exception(sprintf('Unable to find property "%s" in %s.', $name, $path));
   }
 
+  /**
+   * Helper to find a project user's ID by searching their name or username.
+   *
+   * @param string $search
+   *   The name or username to search for.
+   *
+   * @return int
+   *   The internal user ID.
+   *
+   * @throws Exception If no user or multiple users are found.
+   */
   private function findProjectUserId(string $search): int {
     $items = $this->apiGet('/assignments');
     $searchNormalized = $this->normalizeLookupValue($search);
@@ -321,10 +414,25 @@ class CodebaseMCPServer {
     throw new Exception(sprintf('Unable to find project user "%s".', $search));
   }
 
+  /**
+   * Normalizes a string for comparison during lookups.
+   *
+   * @param string $value
+   *   The value to normalize.
+   *
+   * @return string
+   *   The normalized string.
+   */
   private function normalizeLookupValue(string $value): string {
     return mb_strtolower(trim(preg_replace('/\s+/', ' ', $value)));
   }
 
+  /**
+   * Lists available static resources.
+   *
+   * @return array
+   *   A list of resource definitions.
+   */
   private function listResources(): array {
     return [
       'resources' => [
@@ -338,6 +446,17 @@ class CodebaseMCPServer {
     ];
   }
 
+  /**
+   * Reads the content of a specific resource.
+   *
+   * @param string $uri
+   *   The URI of the resource to read.
+   *
+   * @return array
+   *   The resource content.
+   *
+   * @throws Exception If the resource URI is not found.
+   */
   private function readResource(string $uri): array {
     if ($uri === 'docs://tickets/search') {
       return [
@@ -353,6 +472,19 @@ class CodebaseMCPServer {
     throw new Exception("Resource not found: $uri");
   }
 
+  /**
+   * Performs a GET request to the Codebase API.
+   *
+   * @param string $path
+   *   The relative API path.
+   * @param array $params
+   *   Optional query parameters.
+   *
+   * @return array
+   *   The decoded JSON response.
+   *
+   * @throws Exception On API or network errors.
+   */
   private function apiGet(string $path, array $params = []): array {
     $url = $this->baseUrl . $path . '.json';
     if ($params) {
@@ -375,6 +507,19 @@ class CodebaseMCPServer {
     return json_decode($response, true) ?? [];
   }
 
+  /**
+   * Performs a POST request to the Codebase API.
+   *
+   * @param string $path
+   *   The relative API path.
+   * @param array $data
+   *   The data to be sent in the request body.
+   *
+   * @return array
+   *   The decoded JSON response.
+   *
+   * @throws Exception On API or network errors.
+   */
   private function apiPost(string $path, array $data): array {
     $url = $this->baseUrl . $path . '.json';
     $ch = curl_init($url);
@@ -390,31 +535,30 @@ class CodebaseMCPServer {
       'Content-Length: ' . strlen($payload)
     ]);
 
-        $response = curl_exec($ch);
-        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $response = curl_exec($ch);
+    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
-        if ($status >= 400) {
-          throw new Exception("Codebase API error ($status): " . $response);
-        }
-
-        curl_close($ch);
-        return json_decode($response, true) ?? [];
-      }
-
+    if ($status >= 400) {
+      throw new Exception("Codebase API error ($status): " . $response);
     }
 
-    // Usage (CLI entry point)
-    if (php_sapi_name() === 'cli') {
-      if (getenv('CODEBASE_API_KEY') === false) trigger_error('Missing required environment variable "CODEBASE_API_KEY".', E_USER_ERROR);
-      if (getenv('CODEBASE_API_URL') === false) trigger_error('Missing required environment variable "CODEBASE_API_URL".', E_USER_ERROR);
-      if (getenv('CODEBASE_PROJECT') === false) trigger_error('Missing required environment variable "CODEBASE_PROJECT".', E_USER_ERROR);
-      if (getenv('CODEBASE_USERNAME') === false) trigger_error('Missing required environment variable "CODEBASE_USERNAME".', E_USER_ERROR);
+    curl_close($ch);
+    return json_decode($response, true) ?? [];
+  }
 
-      $server = new CodebaseMCPServer(
-        getenv('CODEBASE_USERNAME') ?: 'user/account',
-        getenv('CODEBASE_API_KEY') ?: '',
-        getenv('CODEBASE_PROJECT') ?: ''
-      );
-      $server->run();
-    }
-    
+}
+
+// Usage (CLI entry point)
+if (php_sapi_name() === 'cli') {
+  if (getenv('CODEBASE_API_KEY') === false) trigger_error('Missing required environment variable "CODEBASE_API_KEY".', E_USER_ERROR);
+  if (getenv('CODEBASE_API_URL') === false) trigger_error('Missing required environment variable "CODEBASE_API_URL".', E_USER_ERROR);
+  if (getenv('CODEBASE_PROJECT') === false) trigger_error('Missing required environment variable "CODEBASE_PROJECT".', E_USER_ERROR);
+  if (getenv('CODEBASE_USERNAME') === false) trigger_error('Missing required environment variable "CODEBASE_USERNAME".', E_USER_ERROR);
+
+  $server = new CodebaseMCPServer(
+    getenv('CODEBASE_USERNAME') ?: 'user/account',
+    getenv('CODEBASE_API_KEY') ?: '',
+    getenv('CODEBASE_PROJECT') ?: ''
+  );
+  $server->run();
+}
