@@ -33,6 +33,20 @@ with the following config:
 
 Also set the correct working directory (project root) and server level (project). 
 
+The MCP-server provides the following tools:
+
+* list_tickets
+* get_ticket
+* get_ticket_notes
+* get_ticket_statuses
+* get_ticket_priorities
+* get_ticket_categories
+* get_ticket_types
+* create_ticket
+* update_ticket
+* get_milestones
+* get_project_activity
+
 ### Task Server
 
 Configure a task server at _Tools > Tasks > Servers_, add a _Generic_ server with the
