@@ -166,7 +166,7 @@ class CodebaseMCPServer {
               'status' => ['type' => 'string', 'description' => 'New status name'],
               'priority' => ['type' => 'string', 'description' => 'New priority name'],
               'category' => ['type' => 'string', 'description' => 'New category name'],
-              'assignee' => ['type' => 'string', 'description' => 'Username of the new assignee'],
+              'assignee' => ['type' => 'string', 'description' => 'Username or full name of the new assignee'],
               'summary' => ['type' => 'string', 'description' => 'New summary/title'],
             ],
             'required' => ['ticket_id']
@@ -188,6 +188,14 @@ class CodebaseMCPServer {
             'properties' => (object)[]
           ]
         ],
+        [
+          'name' => 'get_project_users',
+          'description' => 'Get all users assigned to the project',
+          'inputSchema' => [
+            'type' => 'object',
+            'properties' => (object)[]
+          ]
+        ],
       ]
     ];
   }
@@ -197,14 +205,15 @@ class CodebaseMCPServer {
       'list_tickets' => $this->apiGet("/tickets", ['query' => $args['query'] ?? 'status:open']),
       'get_ticket' => $this->apiGet("/tickets/{$args['ticket_id']}"),
       'get_ticket_notes' => $this->apiGet("/tickets/{$args['ticket_id']}/notes"),
-      'get_ticket_statuses' => $this->apiGet("/tickets/statuses"), // Added
-      'get_ticket_priorities' => $this->apiGet("/tickets/priorities"), // Added
-      'get_ticket_categories' => $this->apiGet("/tickets/categories"), // Added
-      'get_ticket_types' => $this->apiGet("/tickets/types"), // Added
+      'get_ticket_statuses' => $this->apiGet("/tickets/statuses"),
+      'get_ticket_priorities' => $this->apiGet("/tickets/priorities"),
+      'get_ticket_categories' => $this->apiGet("/tickets/categories"),
+      'get_ticket_types' => $this->apiGet("/tickets/types"),
       'create_ticket' => $this->apiPost("/tickets", ['ticket' => $args]),
-      'update_ticket' => $this->apiPost("/tickets/{$args['ticket_id']}/notes", ['ticket_note' => $args]),
+      'update_ticket' => $this->apiPost("/tickets/{$args['ticket_id']}/notes", $this->buildTicketNotePayload($args)),
       'get_milestones' => $this->apiGet("/milestones"),
       'get_project_activity' => $this->apiGet("/activity"),
+      'get_project_users' => $this->apiGet("/assignments"),
       default => throw new Exception("Unknown tool: $name"),
     };
 
@@ -213,6 +222,107 @@ class CodebaseMCPServer {
         ['type' => 'text', 'text' => json_encode($content, JSON_PRETTY_PRINT)]
       ]
     ];
+  }
+
+  private function buildTicketNotePayload(array $args): array {
+    $ticketNote = [
+      'content' => (string) ($args['content'] ?? ''),
+    ];
+
+    $changes = [];
+
+    if (!empty($args['status'])) {
+      $changes['status_id'] = $this->findPropertyIdByName('/tickets/statuses', $args['status']);
+    }
+
+    if (!empty($args['priority'])) {
+      $changes['priority_id'] = $this->findPropertyIdByName('/tickets/priorities', $args['priority']);
+    }
+
+    if (!empty($args['category'])) {
+      $changes['category_id'] = $this->findPropertyIdByName('/tickets/categories', $args['category']);
+    }
+
+    if (!empty($args['assignee'])) {
+      $changes['assignee_id'] = $this->findProjectUserId($args['assignee']);
+    }
+
+    if (!empty($args['summary'])) {
+      $changes['summary'] = $args['summary'];
+    }
+
+    if ($changes !== []) {
+      $ticketNote['changes'] = $changes;
+    }
+
+    return ['ticket_note' => $ticketNote];
+  }
+
+  private function findPropertyIdByName(string $path, string $name): int {
+    $items = $this->apiGet($path);
+
+    foreach ($items as $item) {
+      $property = is_array($item) && count($item) === 1 ? reset($item) : $item;
+      if (
+        is_array($property)
+        && isset($property['name'])
+        && strcasecmp((string) $property['name'], $name) === 0
+        && isset($property['id'])
+      ) {
+        return (int) $property['id'];
+      }
+    }
+
+    throw new Exception(sprintf('Unable to find property "%s" in %s.', $name, $path));
+  }
+
+  private function findProjectUserId(string $search): int {
+    $items = $this->apiGet('/assignments');
+    $searchNormalized = $this->normalizeLookupValue($search);
+
+    $matches = [];
+
+    foreach ($items as $item) {
+      $user = is_array($item) && count($item) === 1 ? reset($item) : $item;
+      if (!is_array($user) || !isset($user['id'])) {
+        continue;
+      }
+
+      $candidates = [];
+
+      if (!empty($user['username'])) {
+        $candidates[] = (string) $user['username'];
+      }
+
+      if (!empty($user['name'])) {
+        $candidates[] = (string) $user['name'];
+      }
+
+      if (!empty($user['first_name']) || !empty($user['last_name'])) {
+        $candidates[] = trim(((string) ($user['first_name'] ?? '')) . ' ' . ((string) ($user['last_name'] ?? '')));
+      }
+
+      foreach ($candidates as $candidate) {
+        if ($this->normalizeLookupValue($candidate) === $searchNormalized) {
+          $matches[] = $user;
+          break;
+        }
+      }
+    }
+
+    if (count($matches) === 1) {
+      return (int) $matches[0]['id'];
+    }
+
+    if (count($matches) > 1) {
+      throw new Exception(sprintf('Multiple project users matched "%s". Please use a more specific assignee value.', $search));
+    }
+
+    throw new Exception(sprintf('Unable to find project user "%s".', $search));
+  }
+
+  private function normalizeLookupValue(string $value): string {
+    return mb_strtolower(trim(preg_replace('/\s+/', ' ', $value)));
   }
 
   private function listResources(): array {
@@ -280,30 +390,31 @@ class CodebaseMCPServer {
       'Content-Length: ' . strlen($payload)
     ]);
 
-    $response = curl_exec($ch);
-    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $response = curl_exec($ch);
+        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
-    if ($status >= 400) {
-      throw new Exception("Codebase API error ($status): " . $response);
+        if ($status >= 400) {
+          throw new Exception("Codebase API error ($status): " . $response);
+        }
+
+        curl_close($ch);
+        return json_decode($response, true) ?? [];
+      }
+
     }
 
-    curl_close($ch);
-    return json_decode($response, true) ?? [];
-  }
+    // Usage (CLI entry point)
+    if (php_sapi_name() === 'cli') {
+      if (getenv('CODEBASE_API_KEY') === false) trigger_error('Missing required environment variable "CODEBASE_API_KEY".', E_USER_ERROR);
+      if (getenv('CODEBASE_API_URL') === false) trigger_error('Missing required environment variable "CODEBASE_API_URL".', E_USER_ERROR);
+      if (getenv('CODEBASE_PROJECT') === false) trigger_error('Missing required environment variable "CODEBASE_PROJECT".', E_USER_ERROR);
+      if (getenv('CODEBASE_USERNAME') === false) trigger_error('Missing required environment variable "CODEBASE_USERNAME".', E_USER_ERROR);
 
-}
-
-// Usage (CLI entry point)
-if (php_sapi_name() === 'cli') {
-  if (getenv('CODEBASE_API_KEY') === false) trigger_error('Missing required environment variable "CODEBASE_API_KEY".', E_USER_ERROR);
-  if (getenv('CODEBASE_API_URL') === false) trigger_error('Missing required environment variable "CODEBASE_API_URL".', E_USER_ERROR);
-  if (getenv('CODEBASE_PROJECT') === false) trigger_error('Missing required environment variable "CODEBASE_PROJECT".', E_USER_ERROR);
-  if (getenv('CODEBASE_USERNAME') === false) trigger_error('Missing required environment variable "CODEBASE_USERNAME".', E_USER_ERROR);
-
-  $server = new CodebaseMCPServer(
-    getenv('CODEBASE_USERNAME') ?: 'user/account',
-    getenv('CODEBASE_API_KEY') ?: '',
-    getenv('CODEBASE_PROJECT') ?: ''
-  );
-  $server->run();
-}
+      $server = new CodebaseMCPServer(
+        getenv('CODEBASE_USERNAME') ?: 'user/account',
+        getenv('CODEBASE_API_KEY') ?: '',
+        getenv('CODEBASE_PROJECT') ?: ''
+      );
+      $server->run();
+    }
+    
