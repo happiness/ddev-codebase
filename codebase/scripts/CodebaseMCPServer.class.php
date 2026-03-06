@@ -15,7 +15,21 @@ class CodebaseMCPServer {
     $this->baseUrl = "https://api3.codebasehq.com/{$this->project}";
   }
 
-  public function handleRequest(array $request): array {
+  /**
+   * Main loop to handle MCP requests from stdin and respond to stdout.
+   */
+  public function run(): void {
+    $stdin = fopen('php://stdin', 'r');
+    while ($line = fgets($stdin)) {
+      $request = json_decode($line, true);
+      if (!$request) continue;
+
+      $response = $this->handleRequest($request);
+      echo json_encode($response) . "\n";
+    }
+  }
+
+  private function handleRequest(array $request): array {
     $method = $request['method'] ?? '';
     $params = $request['params'] ?? [];
     $id = $request['id'] ?? null;
@@ -23,8 +37,8 @@ class CodebaseMCPServer {
     try {
       $result = match ($method) {
         'initialize' => $this->initialize(),
-        'list_tools' => $this->listTools(),
-        'call_tool' => $this->callTool($params['name'] ?? '', $params['arguments'] ?? []),
+        'tools/list' => $this->listTools(),
+        'tools/call' => $this->callTool($params['name'] ?? '', $params['arguments'] ?? []),
         default => throw new Exception("Method not found: $method"),
       };
 
@@ -119,4 +133,19 @@ class CodebaseMCPServer {
     return json_decode($response, true) ?? [];
   }
 
+}
+
+// Usage (CLI entry point)
+if (php_sapi_name() === 'cli') {
+  if (getenv('CODEBASE_API_KEY') === false) trigger_error('Missing required environment variable "CODEBASE_API_KEY".', E_USER_ERROR);
+  if (getenv('CODEBASE_API_URL') === false) trigger_error('Missing required environment variable "CODEBASE_API_URL".', E_USER_ERROR);
+  if (getenv('CODEBASE_PROJECT') === false) trigger_error('Missing required environment variable "CODEBASE_PROJECT".', E_USER_ERROR);
+  if (getenv('CODEBASE_USERNAME') === false) trigger_error('Missing required environment variable "CODEBASE_USERNAME".', E_USER_ERROR);
+
+  $server = new CodebaseMCPServer(
+    getenv('CODEBASE_USERNAME') ?: 'user/account',
+    getenv('CODEBASE_API_KEY') ?: '',
+    getenv('CODEBASE_PROJECT') ?: ''
+  );
+  $server->run();
 }

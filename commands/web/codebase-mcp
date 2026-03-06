@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#ddev-generated
+## Description: Run Codebase MCP server
+## Usage: codebase-mcp
+## Example: "ddev codebase-mcp"
+## HostWorkingDir: false
+
+./ddev/codebase/scripts/php CodebaseMCPServer.class.php

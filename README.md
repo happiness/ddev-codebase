@@ -11,6 +11,28 @@ ddev add-on get happiness/ddev-codebase
 
 ## PhpStorm Integration
 
+### MCP Server
+
+Configure a MCP server at _Tools > AI Assistant > Model Context Protocol (MCP)_
+with the following config:
+
+```json
+{
+  "mcpServers": {
+    "codebase": {
+      "command": "ddev",
+      "args": [
+        "exec",
+        "php",
+        ".ddev/codebase/scripts/CodebaseMCPServer.class.php"
+      ]
+    }
+  }
+}
+```
+
+### Task Server
+
 Configure a task server at _Tools > Tasks > Servers_, add a _Generic_ server with the
 following config:
 
