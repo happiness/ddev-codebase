@@ -5,4 +5,4 @@
 ## Example: "ddev codebase-mcp"
 ## HostWorkingDir: false
 
-./ddev/codebase/scripts/php CodebaseMCPServer.class.php
+php ./ddev/codebase/scripts/CodebaseMCPServer.class.php
