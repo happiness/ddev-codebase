@@ -62,6 +62,7 @@ project_files:
   - .env.codebase
   - codebase/scripts/CodebaseAPI.class.php
   - codebase/scripts/codebase.php
+  - codebase/scripts/CodebaseMCPServer.class.php
 
 # List of files and directories that are copied into the global .ddev directory
 # DDEV environment variables can be interpolated into these filenames
