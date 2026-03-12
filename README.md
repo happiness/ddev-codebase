@@ -1,5 +1,9 @@
 # ddev-codebase
 
+**Deprecated**: This project is deprecated. Please see [Codebase MCP Server](https://github.com/petertornstrand/codebase-mcp-server)
+for a replacement for the MCP server part. The task server will not be replaced as I
+do not use it.
+
 This is a DDEV add-on for [Codebase](https://www.codebasehq.com), a project managment
 software.
 
